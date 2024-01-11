@@ -12,8 +12,7 @@ def run():
     bot = commands.Bot(command_prefix = '!', intents = intents)
     sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=settings.spotify_client_id,
                                                    client_secret=settings.spotify_client_secret,
-                                                   redirect_uri="http://localhost:8080",
-                                                   scope="user-read-currently-playing"))
+                                                   redirect_uri='http://localhost:8888/',))
 
     @bot.command(name = 'play')
     async def play(ctx, *url):
@@ -31,17 +30,17 @@ def run():
 
         song = ' '.join(word for word in url)
 
-        results = sp.search(q=song, type='track', limit=1)
+        results = sp.search(q=song, limit=1)
 
         if results['tracks']['items']:
             track = results['tracks']['items'][0]
             song = results['tracks']['items'][0]['name']
             artist = results['tracks']['items'][0]['artists'][0]['name']
             track_uri = track['uri']
+            print(track_uri)
             await ctx.send(f"Playing **{song}** by **{artist}**")
             sp.start_playback(uris=[track_uri])
 
-        # await ctx.send('Playing ' + song + '...')
 
     @bot.command(name = 'pause')
     async def pause(ctx):
