@@ -9,12 +9,17 @@ import requests
 def run():
     intents = discord.Intents.default()
     intents.message_content = True
-    bot = commands.Bot(command_prefix = '!', intents = intents)
-    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=settings.spotify_client_id,
-                                                   client_secret=settings.spotify_client_secret,
-                                                   redirect_uri='http://localhost:8888/',))
+    bot = commands.Bot(command_prefix='!', intents=intents)
+    sp_auth = SpotifyOAuth(client_id=settings.spotify_client_id,
+                           client_secret=settings.spotify_client_secret,
+                           redirect_uri=settings.spotify_redirect_uri,
+                           scope='user-read-playback-state user-modify-playback-state user-read-currently-playing')
 
-    @bot.command(name = 'play')
+    token = sp_auth.get_access_token(as_dict=False)
+
+    sp = spotipy.Spotify(auth=token)
+
+    @bot.command(name='play')
     async def play(ctx, *url):
         try:
             voiceChannel = ctx.author.voice.channel
@@ -37,28 +42,36 @@ def run():
             song = results['tracks']['items'][0]['name']
             artist = results['tracks']['items'][0]['artists'][0]['name']
             track_uri = track['uri']
-            print(track_uri)
             await ctx.send(f"Playing **{song}** by **{artist}**")
             sp.start_playback(uris=[track_uri])
 
-
-    @bot.command(name = 'pause')
+    @bot.command(name='pause')
     async def pause(ctx):
         await ctx.send('Pausing...')
+        sp.pause_playback()
 
-    @bot.command(name = 'resume')
+    @bot.command(name='resume')
     async def resume(ctx):
         await ctx.send('Resuming...')
+        sp.start_playback()
 
-    @bot.command(name = 'skip')
+    @bot.command(name='skip')
     async def skip(ctx):
         await ctx.send('Skipping...')
+        sp.next_track()
 
-    @bot.command(name = 'queue')
-    async def queue(ctx):
-        await ctx.send('Queue:')
+    @bot.command(name='queue')
+    async def queue(ctx, url):
 
-    @bot.command(name = 'join')
+        song = ' '.join(word for word in url)
+        results = sp.search(q=song, limit=1)
+        if results['tracks']['items']:
+            track = results['tracks']['items'][0]
+            track_uri = track['uri']
+            sp.add_to_queue(track_uri)
+            await ctx.send(f"Added **{track['name']}** by **{track['artists'][0]['name']}** to the queue")
+
+    @bot.command(name='join')
     async def join(ctx):
         try:
             voiceChannel = ctx.author.voice.channel
@@ -75,10 +88,15 @@ def run():
         except AttributeError:
             await ctx.send("You're not in a VC")
 
-    @bot.command(name = 'leave')
+    @bot.command(name='leave')
     async def leave(ctx):
-        await ctx.send('Leaving voice channel...')
-        await ctx.voice_client.disconnect()
+
+        if ctx.voice_client:
+            await ctx.voice_client.disconnect()
+            await ctx.send('Leaving voice channel...')
+        else:
+            await ctx.send("I'm not in a VC")
+
     @bot.event
     async def on_ready():
         print(f'{bot.user} has connected to Discord!')
